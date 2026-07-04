@@ -1,0 +1,14 @@
+﻿namespace backend.Models;
+public class User
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+    public string PasswordHash { get; set; } = string.Empty;
+    public string Role { get; set; } = "user";
+}
+
+public record RegisterDto(string Name, string Email, string Password);
+
+public record LoginDto(string Email, string Password);
+

@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="backend.csproj" />
+  <Project Path="RecipeApp.Tests/RecipeApp.Tests.csproj" />
+</Solution>
