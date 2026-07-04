@@ -1,39 +1,106 @@
-﻿document.getElementById("login-form").addEventListener("submit", async (e) => {
-    e.preventDefault();
+﻿const { createApp } = Vue;
+const TOKEN_KEY = "access_token";
 
-    const res = await fetch("/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            email: document.getElementById("email").value,
-            password: document.getElementById("password").value
-        })
-    });
-
-    const data = await res.json();
-    localStorage.setItem("access_token", data.access_token);
-    alert("Успішно! Токен збережено.");
+axios.interceptors.request.use((config) => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (token) {
+        config.headers.Authorization = "Bearer " + token;
+    }
+    return config;
 });
 
-document.getElementById("load-btn").addEventListener("click", async () => {
-    const token = localStorage.getItem("access_token");
+createApp({
+    data() {
+        return {
+            items: [],
+            loading: true,
+            loginForm: {
+                email: "",
+                password: ""
+            },
+            newRecipe: {
+                name: "",
+                itemResult: "",
+                count: 1,
+                isShapeless: false,
+                ingredients: {}
+            },
+            ingredientsInput: ""
+        };
+    },
+    
+    async mounted() {
+        await this.loadItems();
+    },
 
-    const res = await fetch("/recipes", {
-        headers: { "Authorization": "Bearer " + token }
-    });
+    methods: {
+        async loadItems() {
+            try {
+                this.loading = true;
+                const response = await axios.get("/recipes");
+                this.items = response.data;
+            } catch (error) {
+                console.error("Помилка завантаження даних:", error);
+            } finally {
+                this.loading = false;
+            }
+        },
+        
+        async addItem() {
+            try {
+                const cleanIngredients = this.ingredientsInput.split(',')
+                    .map(i => i.trim())
+                    .filter(i => i.length > 0);
 
-    const recipes = await res.json();
+                const ingredientsDict = {};
+                cleanIngredients.forEach((ing, index) => {
+                    ingredientsDict[index.toString()] = ing;
+                });
 
-    document.getElementById("data-list").innerHTML = recipes
-        .map(r => {
-            const ingredientsList = Object.values(r.ingredients).join(", ");
+                this.newRecipe.ingredients = ingredientsDict;
 
-            return `
-                <li>
-                    <div class="recipe-name">${r.name}</div>
-                    <div class="recipe-ingredients">${ingredientsList || "Без інгредієнтів"}</div>
-                </li>
-            `;
-        })
-        .join("");
-});
+                const response = await axios.post("/recipes", this.newRecipe);
+                
+                this.items.push(response.data);
+                
+                this.newRecipe = { name: "", itemResult: "", count: 1, isShapeless: false, ingredients: {} };
+                this.ingredientsInput = "";
+            } catch (error) {
+                console.error("Не вдалося створити запис:", error);
+            }
+        },
+        
+        async updateItem(item) {
+            try {
+                await axios.put("/recipes/" + item.id, item);
+                console.log(`Рецепт ${item.id} оновлено.`);
+            } catch (error) {
+                console.error("Помилка оновлення:", error);
+            }
+        },
+        
+        async deleteItem(id) {
+            try {
+                await axios.delete("/recipes/" + id);
+                this.items = this.items.filter((item) => item.id !== id);
+            } catch (error) {
+                console.error("Помилка видалення:", error);
+            }
+        },
+        
+        async login() {
+            try {
+                const response = await axios.post("/auth/login", this.loginForm);
+                localStorage.setItem(TOKEN_KEY, response.data.access_token);
+                alert("Успішно авторизовано! Токен збережено.");
+
+                this.loginForm.email = "";
+                this.loginForm.password = "";
+                await this.loadItems();
+            } catch (error) {
+                alert("Помилка входу! Перевірте логін та пароль.");
+                console.error(error);
+            }
+        }
+    }
+}).mount("#app");
